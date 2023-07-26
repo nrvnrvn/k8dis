@@ -1,3 +1,10 @@
+.DEFAULT_GOAL = help
+SHELL := /usr/bin/env bash
+.SHELLFLAGS := -eu -o pipefail -c
+.ONESHELL:
+.DELETE_ON_ERROR:
+MAKEFLAGS += --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
 
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
@@ -16,11 +23,6 @@ endif
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
 CONTAINER_TOOL ?= docker
-
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
-SHELL = /usr/bin/env bash -o pipefail
-.SHELLFLAGS = -ec
 
 .PHONY: all
 all: build
@@ -63,6 +65,21 @@ vet: ## Run go vet against code.
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+
+.PHONY: lint
+lint: ## Lint source code
+	@golangci-lint run
+
+.PHONY: mod
+mod: ## Verify and download go modules
+	@true >go.sum
+	@go mod tidy -v
+	@go mod verify
+
+.PHONY: mod-outdated
+mod-outdated: mod ## List outdated modules
+	@printf "Checking direct dependencies for updates...\n"
+	@go list -u -m -f '{{if (and (not .Indirect) .Update)}}{{.}}{{end}}' all
 
 ##@ Build
 
